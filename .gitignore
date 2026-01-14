@@ -1,0 +1,20 @@
+# Environments
+venv/
+__pycache__/
+*.pyc
+
+# Outputs
+char_*.png
+char_upload_*.png
+action_*.mp4
+realism_*.mp4
+debug_*.png
+*.log
+
+# Sensitive
+.env
+api_keys.txt
+
+# System
+.DS_Store
+Thumbs.db

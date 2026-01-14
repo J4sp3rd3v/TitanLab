@@ -1,0 +1,14 @@
+torch
+diffusers
+transformers
+accelerate
+opencv-python
+imageio[ffmpeg]
+sentencepiece
+peft
+huggingface_hub
+gradio
+edge-tts
+moviepy
+pydub
+gradio_client
