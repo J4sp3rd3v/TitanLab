@@ -115,4 +115,5 @@ with gr.Blocks(theme=theme, title="TITAN REMOTE") as app:
     connect_btn.click(connect_to_cloud, inputs=[colab_url_input], outputs=[status_box])
 
 if __name__ == "__main__":
-    app.launch()
+    # Disable SSE queue to prevent WebSocket errors
+    app.queue(api_open=False).launch(show_error=True)
