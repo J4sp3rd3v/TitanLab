@@ -19,7 +19,7 @@ def fn_create_character(prompt, preset, image_input):
         
     return None, "⚠️ Please provide a prompt or upload an image."
 
-def fn_generate_viral_reel(action_prompt, voice_text, preset):
+def fn_generate_viral_reel(action_prompt, voice_text, preset, engine_mode):
     if not titan.director.current_character_path:
         return None, "⚠️ No Character Locked!"
         
@@ -27,7 +27,8 @@ def fn_generate_viral_reel(action_prompt, voice_text, preset):
         character_prompt="", # Already locked or implicit
         action_prompt=action_prompt,
         voice_text=voice_text,
-        preset=preset
+        preset=preset,
+        engine=engine_mode
     )
     return video_path, "✅ Viral Reel Created!"
 

@@ -5,7 +5,7 @@ import os
 import time
 
 # ==============================================================================
-# TITAN REMOTE BRIDGE (V1.0)
+# TITAN REMOTE BRIDGE (V2.0 - FULL CONTROL)
 # ==============================================================================
 print("👾 TITAN REMOTE BRIDGE: LOCAL COMMAND CENTER")
 print("   Connects your PC to the TITAN Cloud Core (Google Colab)")
@@ -26,8 +26,45 @@ def connect_to_cloud(url):
     except Exception as e:
         return f"<!> CONNECTION FAILED: {e}\nCheck if the Colab Notebook is running and 'share=True'."
 
-def local_generate_reel(action_prompt, voice_text, preset, engine_mode):
+def check_connection():
     if not client:
+        return False
+    return True
+
+# --- API WRAPPERS ---
+
+def local_create_character(prompt, preset, image):
+    if not check_connection():
+        yield None, "⚠️ NOT CONNECTED! Enter Colab URL above."
+        return
+    
+    try:
+        yield None, "📸 GENERATING CHARACTER... (Sending to Cloud)"
+        
+        result = client.predict(
+            prompt,
+            preset,
+            image,
+            api_name="/create_character"
+        )
+        
+        img_temp = result[0]
+        status = result[1]
+        
+        os.makedirs("downloads", exist_ok=True)
+        local_img = f"downloads/char_{int(time.time())}.png"
+        
+        if img_temp and os.path.exists(img_temp):
+            shutil.copy(img_temp, local_img)
+            yield local_img, f"{status} (Saved locally)"
+        else:
+            yield None, f"⚠️ Error: No image returned. {status}"
+            
+    except Exception as e:
+        yield None, f"<!> API ERROR: {e}"
+
+def local_generate_reel(action_prompt, voice_text, preset, engine_mode):
+    if not check_connection():
         yield None, "⚠️ NOT CONNECTED! Enter Colab URL above."
         return
     
@@ -35,7 +72,6 @@ def local_generate_reel(action_prompt, voice_text, preset, engine_mode):
         yield None, "🚀 SENDING JOB TO CLOUD... (Please wait 2-5 mins)"
         print(f"🚀 SENDING JOB TO CLOUD: {action_prompt} ({engine_mode})")
         
-        # Call the API
         result = client.predict(
             action_prompt,
             voice_text,
@@ -44,77 +80,126 @@ def local_generate_reel(action_prompt, voice_text, preset, engine_mode):
             api_name="/generate_reel"
         )
         
-        # Result is [video_path, status_text] usually, but client returns tuple
-        # Depending on Gradio version, it might be a list or tuple.
-        # Gradio Client downloads the file to a temp dir locally.
-        
         video_temp_path = result[0]
         status_text = result[1]
         
-        # Move to local 'downloads' folder
         os.makedirs("downloads", exist_ok=True)
         local_filename = f"downloads/titan_reel_{int(time.time())}.mp4"
         
-        # Check if video path is valid
         if video_temp_path and os.path.exists(video_temp_path):
             shutil.copy(video_temp_path, local_filename)
-            yield local_filename, f"{status_text} (Saved to {local_filename})"
+            yield local_filename, f"{status_text} (Saved locally)"
         else:
             yield None, f"⚠️ Error: No video returned. Status: {status_text}"
             
     except Exception as e:
         yield None, f"<!> API ERROR: {e}"
 
-def local_create_character(prompt, preset, image):
-    if not client:
-        return None, "⚠️ NOT CONNECTED!"
+def local_generate_horror(story_script, scene_desc):
+    if not check_connection():
+        yield None, "⚠️ NOT CONNECTED! Enter Colab URL above."
+        return
+
     try:
+        yield None, "👻 GENERATING HORROR STORY... (This may take 5-10 mins)"
+        
         result = client.predict(
-            prompt,
-            preset,
-            image,
-            api_name="/create_character"
+            story_script,
+            scene_desc,
+            api_name="/generate_horror"
         )
-        img_temp = result[0]
-        status = result[1]
+        
+        video_temp_path = result[0]
+        status_text = result[1]
         
         os.makedirs("downloads", exist_ok=True)
-        local_img = f"downloads/char_{int(time.time())}.png"
-        if img_temp and os.path.exists(img_temp):
-            shutil.copy(img_temp, local_img)
-            return local_img, status
-        return None, status
+        local_filename = f"downloads/horror_{int(time.time())}.mp4"
+        
+        if video_temp_path and os.path.exists(video_temp_path):
+            shutil.copy(video_temp_path, local_filename)
+            yield local_filename, f"{status_text} (Saved locally)"
+        else:
+            yield None, f"⚠️ Error: No video returned. {status_text}"
+
     except Exception as e:
-        return None, str(e)
+        yield None, f"<!> API ERROR: {e}"
 
 # ==============================================================================
-# LOCAL UI (LIGHTWEIGHT)
+# LOCAL UI (FULL MIRROR)
 # ==============================================================================
 theme = gr.themes.Glass(primary_hue="cyan", secondary_hue="slate")
 
-with gr.Blocks(theme=theme, title="TITAN REMOTE") as app:
-    gr.Markdown("# 👾 TITAN REMOTE BRIDGE")
-    gr.Markdown("### ☁️ Control the Cloud from your PC.")
+with gr.Blocks(theme=theme, title="TITAN REMOTE V2") as app:
+    gr.Markdown("# 👾 TITAN REMOTE: LOCAL CONTROL CENTER")
+    gr.Markdown("### ☁️ Powered by Google Colab Cloud Core")
     
     with gr.Row():
-        colab_url_input = gr.Textbox(label="Colab Public URL (e.g. https://xxxx.gradio.live)", placeholder="Paste URL here...")
-        connect_btn = gr.Button("🔗 CONNECT", variant="primary")
+        colab_url_input = gr.Textbox(label="Colab Public URL (e.g. https://xxxx.gradio.live)", placeholder="Paste URL from Colab here...")
+        connect_btn = gr.Button("🔗 CONNECT TO CORE", variant="primary")
     
-    status_box = gr.Textbox(label="Connection Status", interactive=False)
+    status_box = gr.Textbox(label="System Status", interactive=False)
     
     with gr.Tabs():
+        # TAB 1: IDENTITY
+        with gr.TabItem("👤 Identity Station"):
+            with gr.Row():
+                with gr.Column():
+                    gr.Markdown("### Create New Character")
+                    preset_dd = gr.Dropdown(
+                        ["None", "✨ TikTok Perfect (Standard)", "🖤 TikTok Artistic (B&W)", "🦋 Unique Beauty (Vitiligo)", 
+                         "🦌 Natural Beauty (Freckles)", "🦇 Goth/Alt Aesthetic", "💄 Insta Baddie (Glam)", 
+                         "💪 Fitness/GymTok", "👻 Creepypasta/Horror", "🏚️ Liminal Spaces (Backrooms)"],
+                        label="Style Preset", value="✨ TikTok Perfect (Standard)"
+                    )
+                    char_prompt = gr.Textbox(label="Character Description", placeholder="e.g. Blonde woman, blue eyes, red dress...")
+                    char_upload = gr.Image(label="Or Upload Source Image", type="filepath")
+                    create_char_btn = gr.Button("📸 GENERATE IDENTITY", variant="primary")
+                    
+                with gr.Column():
+                    char_preview = gr.Image(label="Identity Preview")
+                    char_status = gr.Label()
+            
+            create_char_btn.click(local_create_character, [char_prompt, preset_dd, char_upload], [char_preview, char_status])
+
+        # TAB 2: VIRAL REELS
         with gr.TabItem("🚀 Viral Reels"):
-            action = gr.Textbox(label="Action Prompt")
-            voice = gr.Textbox(label="Voiceover")
-            preset = gr.Dropdown(["✨ TikTok Perfect (Standard)", "🦇 Goth/Alt Aesthetic", "👻 Creepypasta/Horror"], label="Preset", value="✨ TikTok Perfect (Standard)")
-            engine = gr.Radio(["Action Director (AnimateDiff)", "GOD MODE (CogVideoX-5B - Sora Class)"], label="Engine", value="GOD MODE (CogVideoX-5B - Sora Class)")
+            with gr.Row():
+                with gr.Column():
+                    gr.Markdown("### Generate Content")
+                    action = gr.Textbox(label="Action Prompt", placeholder="Dancing to techno, pointing at text...")
+                    voice = gr.Textbox(label="Voiceover Text (Optional)", placeholder="Did you know...")
+                    preset_reel = gr.Dropdown(
+                        ["✨ TikTok Perfect (Standard)", "🦇 Goth/Alt Aesthetic", "👻 Creepypasta/Horror"], 
+                        label="Preset", value="✨ TikTok Perfect (Standard)"
+                    )
+                    engine = gr.Radio(
+                        ["Action Director (AnimateDiff)", "Realism Engine (SVD-XT Pro)", "GOD MODE (CogVideoX-5B - Sora Class)"], 
+                        label="Engine", value="GOD MODE (CogVideoX-5B - Sora Class)"
+                    )
+                    
+                    gen_reel_btn = gr.Button("🎬 GENERATE REEL", variant="stop")
+                    
+                with gr.Column():
+                    out_vid = gr.Video(label="Downloaded Result")
+                    out_stat = gr.Label()
             
-            gen_btn = gr.Button("GENERATE (CLOUD)", variant="stop")
-            out_vid = gr.Video(label="Downloaded Result")
-            out_stat = gr.Label()
+            gen_reel_btn.click(local_generate_reel, [action, voice, preset_reel, engine], [out_vid, out_stat])
+
+        # TAB 3: HORROR
+        with gr.TabItem("👻 Horror Studio"):
+            with gr.Row():
+                with gr.Column():
+                    gr.Markdown("### Generate Horror Story")
+                    story = gr.Textbox(label="Script (One line per scene)", lines=5)
+                    scenes = gr.Textbox(label="Visuals (One line per scene)", lines=5)
+                    gen_horror_btn = gr.Button("💀 GENERATE HORROR", variant="stop")
+                
+                with gr.Column():
+                    horror_vid = gr.Video(label="Horror Result")
+                    horror_stat = gr.Label()
             
-            gen_btn.click(local_generate_reel, [action, voice, preset, engine], [out_vid, out_stat])
-            
+            gen_horror_btn.click(local_generate_horror, [story, scenes], [horror_vid, horror_stat])
+
     connect_btn.click(connect_to_cloud, inputs=[colab_url_input], outputs=[status_box])
 
 if __name__ == "__main__":
