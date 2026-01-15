@@ -179,7 +179,8 @@ class TitanDirector:
             # SWITCHED TO JUGGERNAUT XL LIGHTNING (Faster & High Quality)
             pipe = StableDiffusionXLPipeline.from_pretrained(
                 "RunDiffusion/Juggernaut-XL-Lightning",
-                torch_dtype=self.dtype
+                torch_dtype=self.dtype,
+                variant="fp16" # FORCE FP16 TO AVOID 10GB DOWNLOAD
             )
             pipe.load_ip_adapter("h94/IP-Adapter", subfolder="sdxl_models", weight_name="ip-adapter_sdxl.bin")
             
@@ -302,7 +303,8 @@ class TitanDirector:
             try:
                 pipe = CogVideoXPipeline.from_pretrained(
                     "THUDM/CogVideoX-2b",
-                    torch_dtype=self.dtype
+                    torch_dtype=self.dtype,
+                    variant="fp16"
                 )
                 pipe.enable_model_cpu_offload()
                 pipe.vae.enable_tiling()

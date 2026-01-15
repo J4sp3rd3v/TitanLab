@@ -28,10 +28,13 @@ def connect_to_cloud(url):
 
 def local_generate_reel(action_prompt, voice_text, preset, engine_mode):
     if not client:
-        return None, "⚠️ NOT CONNECTED! Enter Colab URL above."
+        yield None, "⚠️ NOT CONNECTED! Enter Colab URL above."
+        return
     
     try:
+        yield None, "🚀 SENDING JOB TO CLOUD... (Please wait 2-5 mins)"
         print(f"🚀 SENDING JOB TO CLOUD: {action_prompt} ({engine_mode})")
+        
         # Call the API
         result = client.predict(
             action_prompt,
@@ -55,12 +58,12 @@ def local_generate_reel(action_prompt, voice_text, preset, engine_mode):
         # Check if video path is valid
         if video_temp_path and os.path.exists(video_temp_path):
             shutil.copy(video_temp_path, local_filename)
-            return local_filename, f"{status_text} (Saved to {local_filename})"
+            yield local_filename, f"{status_text} (Saved to {local_filename})"
         else:
-            return None, f"⚠️ Error: No video returned. Status: {status_text}"
+            yield None, f"⚠️ Error: No video returned. Status: {status_text}"
             
     except Exception as e:
-        return None, f"<!> API ERROR: {e}"
+        yield None, f"<!> API ERROR: {e}"
 
 def local_create_character(prompt, preset, image):
     if not client:
@@ -78,7 +81,7 @@ def local_create_character(prompt, preset, image):
         os.makedirs("downloads", exist_ok=True)
         local_img = f"downloads/char_{int(time.time())}.png"
         if img_temp and os.path.exists(img_temp):
-            shutil.copy(img_temp, local_filename)
+            shutil.copy(img_temp, local_img)
             return local_img, status
         return None, status
     except Exception as e:
