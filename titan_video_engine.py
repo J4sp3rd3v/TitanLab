@@ -10,7 +10,8 @@ from diffusers import (
     EulerDiscreteScheduler,
     AnimateDiffPipeline,
     MotionAdapter,
-    DDIMScheduler
+    DDIMScheduler,
+    ControlNetModel
 )
 from diffusers.utils import export_to_video, load_image
 from safetensors.torch import load_file
@@ -20,6 +21,7 @@ import cv2
 from PIL import Image
 import gc
 import numpy as np
+from controlnet_aux import OpenposeDetector
 
 import requests
 import json
@@ -246,7 +248,7 @@ class TitanDirector:
     def load_action_engine(self):
         if self.action_pipe is not None: return
         self._unload_all()
-        print("⚡ LOADING ACTION ENGINE (AnimateDiff Lightning)...")
+        print("⚡ LOADING ACTION ENGINE (AnimateDiff Lightning + ControlNet)...")
         try:
             # 1. Load 4-Step Lightning Motion Module manually
             print("   -> Downloading Lightning weights...")
@@ -257,17 +259,25 @@ class TitanDirector:
             
             # 3. Inject Weights
             state_dict = load_file(ckpt_path, device="cpu")
-            # Filter state_dict if necessary or load directly
             adapter.load_state_dict(state_dict)
             
-            # 4. Create Pipeline
+            # 4. Load ControlNet (OpenPose) for Motion Transfer
+            print("   -> Loading ControlNet (OpenPose)...")
+            controlnet = ControlNetModel.from_pretrained(
+                "lllyasviel/control_v11p_sd15_openpose",
+                torch_dtype=self.dtype
+            )
+
+            # 5. Create Pipeline
             pipe = AnimateDiffPipeline.from_pretrained(
                 "emilianJR/epiCRealism",
                 motion_adapter=adapter,
+                controlnet=controlnet,
                 torch_dtype=self.dtype,
-                variant="fp16" # Ensure FP16 here too
+                variant="fp16"
             )
             pipe.load_ip_adapter("h94/IP-Adapter", subfolder="models", weight_name="ip-adapter_sd15.bin")
+            
             # LIGHTNING RECOMMENDS EULER DISCRETE
             pipe.scheduler = EulerDiscreteScheduler.from_config(
                 pipe.scheduler.config, timestep_spacing="trailing", beta_schedule="linear"
@@ -275,9 +285,76 @@ class TitanDirector:
             pipe.enable_model_cpu_offload()
             pipe.vae.enable_tiling()
             self.action_pipe = pipe
-            print("✅ ACTION ENGINE READY (EULER DISCRETE).")
+            
+            # Load Detector
+            self.openpose = OpenposeDetector.from_pretrained("lllyasviel/ControlNet")
+            
+            print("✅ ACTION ENGINE READY (Motion Control Active).")
         except Exception as e:
             print(f"<!> ACTION ENGINE ERROR: {e}")
+
+    def generate_motion_transfer(self, prompt, source_video_path):
+        """
+        Generates a video where the character mimics the source video motion (Nano Banana style).
+        """
+        if not self.current_character_path:
+            print("<!> NO CHARACTER SELECTED.")
+            return None
+            
+        self.load_action_engine()
+        full_prompt, neg = self._smart_prompt(prompt)
+        print(f"\n💃 MOTION TRANSFER: '{prompt}' (Source: {source_video_path})...")
+        
+        # 1. Extract Pose Frames from Source Video
+        print("   -> Extracting Pose Skeleton...")
+        cap = cv2.VideoCapture(source_video_path)
+        pose_frames = []
+        frame_count = 0
+        
+        while cap.isOpened() and frame_count < 32: # Limit to 32 frames (~4s)
+            ret, frame = cap.read()
+            if not ret: break
+            
+            # Resize to portrait
+            frame = cv2.resize(frame, (512, 768))
+            # Convert to PIL
+            pil_frame = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            
+            # Extract Pose
+            pose_img = self.openpose(pil_frame)
+            pose_frames.append(pose_img)
+            frame_count += 1
+            
+        cap.release()
+        
+        if not pose_frames:
+            print("<!> FAILED TO READ VIDEO.")
+            return None
+            
+        ref_image = load_image(self.current_character_path)
+        self.action_pipe.set_ip_adapter_scale(0.7) # Strong Identity
+        
+        print(f"   -> Generating {len(pose_frames)} frames...")
+        
+        output = self.action_pipe(
+            prompt=full_prompt,
+            negative_prompt=neg,
+            ip_adapter_image=ref_image,
+            control_image=pose_frames, # Pass poses to ControlNet
+            controlnet_conditioning_scale=1.0, # Strong Control
+            num_frames=len(pose_frames),
+            guidance_scale=1.5,
+            num_inference_steps=8, # Lightning steps
+            width=512,
+            height=768,
+            generator=torch.manual_seed(42)
+        )
+        
+        frames = output.frames[0]
+        filename = f"motion_{os.urandom(4).hex()}.mp4"
+        export_to_video(frames, output_video_path=filename, fps=8)
+        print(f"💾 MOTION TRANSFER SAVED: {filename}")
+        return filename
 
     def load_god_mode(self):
         if self.god_mode_pipe is not None: return

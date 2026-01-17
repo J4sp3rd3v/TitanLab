@@ -124,6 +124,63 @@ def local_generate_horror(story_script, scene_desc):
     except Exception as e:
         yield None, f"<!> API ERROR: {e}"
 
+def local_generate_motion_transfer(prompt, source_video):
+    if not check_connection():
+        yield None, "⚠️ NOT CONNECTED! Enter Colab URL above."
+        return
+
+    try:
+        yield None, "💃 GENERATING MOTION TRANSFER... (Nano Style)"
+        
+        result = client.predict(
+            prompt,
+            source_video,
+            api_name="/generate_motion_transfer"
+        )
+        
+        video_temp_path = result[0]
+        status_text = result[1]
+        
+        os.makedirs("downloads", exist_ok=True)
+        local_filename = f"downloads/motion_{int(time.time())}.mp4"
+        
+        if video_temp_path and os.path.exists(video_temp_path):
+            shutil.copy(video_temp_path, local_filename)
+            yield local_filename, f"{status_text} (Saved locally)"
+        else:
+            yield None, f"⚠️ Error: No video returned. {status_text}"
+
+    except Exception as e:
+        yield None, f"<!> API ERROR: {e}"
+
+def local_generate_auto_movie(prompt):
+    if not check_connection():
+        yield None, "⚠️ NOT CONNECTED! Enter Colab URL above."
+        return
+
+    try:
+        yield None, "🎬 DIRECTING FULL MOVIE... (Sit back, this takes time)"
+        
+        result = client.predict(
+            prompt,
+            api_name="/generate_auto_movie"
+        )
+        
+        video_temp_path = result[0]
+        status_text = result[1]
+        
+        os.makedirs("downloads", exist_ok=True)
+        local_filename = f"downloads/movie_{int(time.time())}.mp4"
+        
+        if video_temp_path and os.path.exists(video_temp_path):
+            shutil.copy(video_temp_path, local_filename)
+            yield local_filename, f"{status_text} (Saved locally)"
+        else:
+            yield None, f"⚠️ Error: No video returned. {status_text}"
+
+    except Exception as e:
+        yield None, f"<!> API ERROR: {e}"
+
 # ==============================================================================
 # LOCAL UI (FULL MIRROR)
 # ==============================================================================
@@ -194,7 +251,31 @@ with gr.Blocks(theme=theme, title="TITAN REMOTE V2") as app:
             
             gen_reel_btn.click(local_generate_reel, [action, voice, preset_reel, engine], [out_vid, out_stat])
 
-        # TAB 3: HORROR
+        # TAB 2: MOTION TRANSFER (NANO BANANA STYLE)
+        with gr.TabItem("💃 Motion Transfer (Nano Style)"):
+             with gr.Row():
+                with gr.Column():
+                    gr.Markdown("### Source Motion")
+                    motion_prompt = gr.Textbox(label="Description", placeholder="A robot dancing...")
+                    source_vid = gr.Video(label="Upload Source Video (Dance/Move)")
+                    gen_motion_btn = gr.Button("🍌 GENERATE MOTION TRANSFER", variant="primary")
+                with gr.Column():
+                    motion_result = gr.Video(label="Result")
+                    motion_status = gr.Label()
+             gen_motion_btn.click(local_generate_motion_transfer, [motion_prompt, source_vid], [motion_result, motion_status])
+
+        # TAB 3: AUTO MOVIE
+        with gr.TabItem("🎬 Auto Movie Director"):
+            with gr.Row():
+                with gr.Column():
+                    movie_prompt = gr.Textbox(label="Movie Concept", placeholder="A cyberpunk detective story in neo-tokyo...")
+                    gen_movie_btn = gr.Button("🎥 ACTION!", variant="stop")
+                with gr.Column():
+                    movie_result = gr.Video(label="Movie Result")
+                    movie_status = gr.Label()
+            gen_movie_btn.click(local_generate_auto_movie, [movie_prompt], [movie_result, movie_status])
+
+        # TAB 4: HORROR
         with gr.TabItem("👻 Horror Studio"):
             with gr.Row():
                 with gr.Column():

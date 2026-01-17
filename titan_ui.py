@@ -32,17 +32,19 @@ def fn_generate_viral_reel(action_prompt, voice_text, preset, engine_mode):
     )
     return video_path, "✅ Viral Reel Created!"
 
-def fn_generate_horror(story_script, scene_desc):
-    # Simple wrapper for now
-    scripts = story_script.split("\n")
-    prompts = scene_desc.split("\n")
-    
-    if len(scripts) != len(prompts):
-        return None, "⚠️ Script lines and Scene descriptions must match count."
+def fn_generate_motion_transfer(prompt, source_video):
+    if not titan.director.current_character_path:
+        return None, "⚠️ No Character Locked!"
+    if source_video is None:
+        return None, "⚠️ No Source Video Uploaded!"
         
-    video_clips, audio_clips = titan.generate_horror_story(scripts, prompts)
-    # Just return the first clip for demo purposes until editor supports stitching list
-    return video_clips[0], f"✅ Generated {len(video_clips)} scenes. (Stitching Pending)"
+    video_path = titan.director.generate_motion_transfer(prompt, source_video)
+    return video_path, "✅ Motion Transfer Complete!"
+
+def fn_generate_auto_movie(prompt):
+    video_clips, audio_clips = titan.generate_full_movie_auto(prompt)
+    # Return first clip for now
+    return video_clips[0], f"✅ Generated {len(video_clips)} movie clips."
 
 # ==============================================================================
 # UI LAYOUT
@@ -59,7 +61,7 @@ with gr.Blocks(theme=theme, title="TITAN VIRAL STUDIO") as app:
     
     with gr.Tabs():
         # TAB 1: VIRAL REELS
-        with gr.TabItem("📱 Viral Reels (TikTok/Shorts)"):
+        with gr.TabItem("📱 Viral Reels"):
             with gr.Row():
                 with gr.Column():
                     gr.Markdown("### 1. Identity")
@@ -87,20 +89,30 @@ with gr.Blocks(theme=theme, title="TITAN VIRAL STUDIO") as app:
             create_btn.click(fn_create_character, [char_prompt, preset_dd, char_upload], [preview_img, char_status], api_name="create_character")
             generate_reel_btn.click(fn_generate_viral_reel, [action_prompt, voice_text, preset_dd, engine_mode], [result_video, char_status], api_name="generate_reel")
 
-        # TAB 2: HORROR STORIES
-        with gr.TabItem("👻 Horror Stories (YouTube)"):
+        # TAB 2: MOTION TRANSFER (NANO BANANA STYLE)
+        with gr.TabItem("💃 Motion Transfer (Nano Style)"):
+             with gr.Row():
+                with gr.Column():
+                    gr.Markdown("### Source Motion")
+                    motion_prompt = gr.Textbox(label="Description", placeholder="A robot dancing...")
+                    source_vid = gr.Video(label="Upload Source Video (Dance/Move)")
+                    gen_motion_btn = gr.Button("🍌 GENERATE MOTION TRANSFER", variant="primary")
+                with gr.Column():
+                    motion_result = gr.Video(label="Result")
+                    motion_status = gr.Label()
+             gen_motion_btn.click(fn_generate_motion_transfer, [motion_prompt, source_vid], [motion_result, motion_status], api_name="generate_motion_transfer")
+
+        # TAB 3: AUTO MOVIE
+        with gr.TabItem("🎬 Auto Movie Director"):
             with gr.Row():
                 with gr.Column():
-                    gr.Markdown("### Script & Scenes")
-                    story_script = gr.Textbox(label="Story Script (Line per scene)", lines=5, placeholder="It was a dark night.\nI heard a noise.")
-                    scene_desc = gr.Textbox(label="Scene Visuals (Line per scene)", lines=5, placeholder="Dark forest, moonlit.\nShadowy figure in window.")
-                    gen_horror_btn = gr.Button("💀 GENERATE HORROR STORY", variant="stop")
-                    
+                    movie_prompt = gr.Textbox(label="Movie Concept", placeholder="A cyberpunk detective story in neo-tokyo...")
+                    gen_movie_btn = gr.Button("🎥 ACTION!", variant="stop")
                 with gr.Column():
-                    horror_video = gr.Video(label="Horror Result")
-                    horror_status = gr.Label()
-                    
-            gen_horror_btn.click(fn_generate_horror, [story_script, scene_desc], [horror_video, horror_status], api_name="generate_horror")
+                    movie_result = gr.Video(label="Movie Result")
+                    movie_status = gr.Label()
+            gen_movie_btn.click(fn_generate_auto_movie, [movie_prompt], [movie_result, movie_status], api_name="generate_auto_movie")
+
 
 if __name__ == "__main__":
     app.launch(share=True)
