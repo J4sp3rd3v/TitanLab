@@ -14,6 +14,18 @@ print("   Connects your PC to the TITAN Cloud Core (Google Colab)")
 CLIENT_URL = None
 client = None
 
+# Auto-Load URL
+if os.path.exists("titan_connect.url"):
+    try:
+        with open("titan_connect.url", "r") as f:
+            auto_url = f.read().strip()
+            if "gradio.live" in auto_url:
+                print(f"🔄 FOUND AUTO-CONNECT URL: {auto_url}")
+                # We can't auto-connect here easily because client needs to be init inside Gradio or global
+                # We will set it as default in the input box
+                CLIENT_URL = auto_url
+    except: pass
+
 def connect_to_cloud(url):
     global CLIENT_URL, client
     try:
@@ -197,11 +209,19 @@ with gr.Blocks(theme=theme, title="TITAN REMOTE V2") as app:
     gr.Markdown("### ☁️ Powered by Google Colab Cloud Core")
     
     with gr.Row():
-        colab_url_input = gr.Textbox(label="Colab Public URL (e.g. https://xxxx.gradio.live)", placeholder="Paste URL from Colab here...")
+        colab_url_input = gr.Textbox(
+            label="Colab Public URL (e.g. https://xxxx.gradio.live)", 
+            placeholder="Paste URL from Colab here...",
+            value=CLIENT_URL if CLIENT_URL else ""
+        )
         connect_btn = gr.Button("🔗 CONNECT TO CORE", variant="primary")
         folder_btn = gr.Button("📂 OPEN DOWNLOADS FOLDER", variant="secondary")
     
     status_box = gr.Textbox(label="System Status", interactive=False)
+    
+    # Auto-connect trigger if URL is present
+    if CLIENT_URL:
+        app.load(connect_to_cloud, inputs=[colab_url_input], outputs=[status_box])
     
     folder_btn.click(open_output_folder, inputs=[], outputs=[status_box])
     
