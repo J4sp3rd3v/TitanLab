@@ -129,6 +129,12 @@ def local_generate_horror(story_script, scene_desc):
 # ==============================================================================
 theme = gr.themes.Glass(primary_hue="cyan", secondary_hue="slate")
 
+def open_output_folder():
+    path = os.path.abspath("downloads")
+    os.makedirs(path, exist_ok=True)
+    os.startfile(path)
+    return f"📂 Opened: {path}"
+
 with gr.Blocks(theme=theme, title="TITAN REMOTE V2") as app:
     gr.Markdown("# 👾 TITAN REMOTE: LOCAL CONTROL CENTER")
     gr.Markdown("### ☁️ Powered by Google Colab Cloud Core")
@@ -136,8 +142,11 @@ with gr.Blocks(theme=theme, title="TITAN REMOTE V2") as app:
     with gr.Row():
         colab_url_input = gr.Textbox(label="Colab Public URL (e.g. https://xxxx.gradio.live)", placeholder="Paste URL from Colab here...")
         connect_btn = gr.Button("🔗 CONNECT TO CORE", variant="primary")
+        folder_btn = gr.Button("📂 OPEN DOWNLOADS FOLDER", variant="secondary")
     
     status_box = gr.Textbox(label="System Status", interactive=False)
+    
+    folder_btn.click(open_output_folder, inputs=[], outputs=[status_box])
     
     with gr.Tabs():
         # TAB 1: IDENTITY
