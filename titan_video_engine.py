@@ -264,7 +264,8 @@ class TitanDirector:
             pipe = AnimateDiffPipeline.from_pretrained(
                 "emilianJR/epiCRealism",
                 motion_adapter=adapter,
-                torch_dtype=self.dtype
+                torch_dtype=self.dtype,
+                variant="fp16" # Ensure FP16 here too
             )
             pipe.load_ip_adapter("h94/IP-Adapter", subfolder="models", weight_name="ip-adapter_sd15.bin")
             # LIGHTNING RECOMMENDS EULER DISCRETE
